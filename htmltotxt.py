@@ -2,6 +2,7 @@ import argparse
 from bs4 import BeautifulSoup
 import pathlib
 import sys
+import traceback
 import zipfile
 
 def transform_html_to_whatsapp(html_file, text_file):
@@ -17,26 +18,32 @@ def transform_html_to_whatsapp(html_file, text_file):
 
     # Transform messages to WhatsApp format
     whatsapp_chat = ''
+    m = 0
     for message in messages:
-        sender_element = message.find('div', class_='from_name')
-        if sender_element is None:
-            continue  # Skip messages without sender information
+        try:
+            sender_element = message.find('div', class_='from_name')
+            if sender_element is None:
+                continue  # Skip messages without sender information
 
-        sender = sender_element.text.strip()
-        timestamp_div = message.find('div', class_="pull_right date details")
-        if timestamp_div:
-            timestamp = timestamp_div['title']
-            date_str = timestamp[:10]
-            time_str = timestamp[11:19]
-        else:
-            date_str, time_str = None, None
+            sender = sender_element.text.strip()
+            timestamp_div = message.find('div', class_="pull_right date details")
+            if timestamp_div:
+                timestamp = timestamp_div['title']
+                date_str = timestamp[:10]
+                time_str = timestamp[11:19]
+            else:
+                date_str, time_str = None, None
 
-        text = message.find('div', class_='text').text.strip()
+            text = message.find('div', class_='text').text.strip()
 
-        # Format message in WhatsApp format
-        if time_str:
-            whatsapp_message = f'[{date_str}, {time_str}] {sender}: {text}\n'
-            whatsapp_chat += whatsapp_message
+            # Format message in WhatsApp format
+            if time_str:
+                whatsapp_message = f'[{date_str}, {time_str}] {sender}: {text}\n'
+                whatsapp_chat += whatsapp_message
+        except AttributeError as e:
+            tbf = traceback.TracebackException.from_exception(e).format()
+            sys.stderr.write("ERROR: Failed to parse message #{m} with traceback:{tbf}, source data follows:\n{message.prettify()}\n")
+        m += 1
 
     # Save the transformed chat to a file
     with open(text_file, 'w', encoding='utf-8') as file:
