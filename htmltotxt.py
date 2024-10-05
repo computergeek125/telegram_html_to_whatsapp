@@ -45,7 +45,7 @@ def transform_html_to_whatsapp(html_file, text_file):
                 for media_link in media_find.find_all('a'):
                     if 'photo_wrap' in media_link['class']:
                         media.append(media_link['href'])
-                    elif 'video_file_wrap' in media_link.attrs:
+                    elif 'video_file_wrap' in media_link['href']:
                         media.append(media_link['href'])
                     else:
                         sys.stderr.write(f"WARN: Detected unknown media type in message #{m} ({date_str} {time_str}): {media_link.attrs}\n")
