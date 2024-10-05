@@ -42,7 +42,7 @@ def transform_html_to_whatsapp(html_file, text_file):
                 whatsapp_chat += whatsapp_message
         except AttributeError as e:
             tbf = traceback.TracebackException.from_exception(e).format()
-            sys.stderr.write("ERROR: Failed to parse message #{m} with traceback:{tbf}, source data follows:\n{message.prettify()}\n")
+            sys.stderr.write(f"ERROR: Failed to parse message #{m} with traceback:{tbf}, source data follows:\n{message.prettify()}\n")
         m += 1
 
     # Save the transformed chat to a file
