@@ -66,7 +66,7 @@ def transform_html_to_whatsapp(html_file):
                         filename_index = media_dates.get(filename_date, 0)
                         media_dates[filename_date] = filename_index+1
                         filename_ext = pathlib.Path(filename).suffix
-                        new_filename = f"{type_classifier}-{filename_date}-WA{filename_index:04}.{file_ext}"
+                        new_filename = f"{type_classifier}-{filename_date}-WA{filename_index:04}.{filename_ext}"
                         media.append((new_filename, filename))
             # Format message in WhatsApp format
             if time_str:
