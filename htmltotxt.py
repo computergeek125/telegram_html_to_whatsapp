@@ -22,7 +22,7 @@ def transform_html_to_whatsapp(html_file):
 
     # Transform messages to WhatsApp format
     whatsapp_chat = ''
-    media = []
+    media_all = []
     media_dates = {}
     m = 0
     date_register = {}
@@ -49,6 +49,7 @@ def transform_html_to_whatsapp(html_file):
                 text = None
             
             media_find = message.find('div', class_='media_wrap')
+            media_message = []
             if media_find is not None:
                 for media_link in media_find.find_all('a'):
                     if 'photo_wrap' in media_link['class'] :
@@ -69,14 +70,15 @@ def transform_html_to_whatsapp(html_file):
                         media_dates[filename_date] = filename_index+1
                         filename_ext = pathlib.Path(filename).suffix
                         new_filename = f"{type_classifier}-{filename_date}-WA{filename_index:04}{filename_ext}"
-                        media.append((new_filename, filename))
+                        media_all.append((new_filename, filename))
+                        media_message.append(new_filename)
             # Format message in WhatsApp format
             if time_str:
                 whatsapp_message = ''
                 if text:
                     whatsapp_message += f'[{date_str}, {time_str}] {sender}: {text}\n'
-                if media:
-                    for media_item in media:
+                if media_message:
+                    for media_item in media_message:
                         whatsapp_message += f'[{date_str}, {time_str}] {sender}: {media_item[0]} (file attached)\n'
                 whatsapp_chat += whatsapp_message
         except AttributeError:
