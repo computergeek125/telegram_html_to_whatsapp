@@ -39,7 +39,7 @@ def transform_html_to_whatsapp(html_file):
             timestamp_div = message.find('div', class_="pull_right date details")
             if timestamp_div:
                 timestamp = timestamp_div['title']
-                real_date = datetime.datetime.strptime(timestamp, '%d.%m.%y %H:%M:%S UTC%z')
+                real_date = datetime.datetime.strptime(timestamp, '%d.%m.%Y %H:%M:%S UTC%z')
                 date_str = timestamp[:10]
                 time_str = timestamp[11:19]
             else:
@@ -78,7 +78,7 @@ def transform_html_to_whatsapp(html_file):
                 whatsapp_chat += whatsapp_message
         except AttributeError:
             tbf = str(traceback.format_exc())
-            sys.stderr.write(f"ERROR: Failed to parse message #{m} with traceback:{tbf}, source data follows:\n{message.prettify()}\n")
+            sys.stderr.write(f"ERROR: Failed to parse message #{m} with traceback:\n{tbf}Source data follows:\n{message.prettify()}\n")
         m += 1
     rval = {"chat": whatsapp_chat, "media": media}
     return rval
