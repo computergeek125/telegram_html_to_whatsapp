@@ -85,7 +85,7 @@ def transform_html_to_whatsapp(html_file):
             tbf = str(traceback.format_exc())
             sys.stderr.write(f"ERROR: Failed to parse message #{m} with traceback:\n{tbf}Source data follows:\n{message.prettify()}\n")
         m += 1
-    rval = {"chat": whatsapp_chat, "media": media}
+    rval = {"chat": whatsapp_chat, "media": media_all}
     return rval
     # Save the transformed chat to a file
     #with open(text_file, 'w', encoding='utf-8') as file:
@@ -136,8 +136,8 @@ if __name__ == "__main__":
             else:
                 file_num = int(file_num)
             input_index.append((input_file, file_num))
-        print(input_index)
         input_index = sorted(input_index, key=lambda x: x[1])
+        sys.stdout.write(f"Discovered {len(input_index)} input files\n")
         for index_entry in input_index:
             input_file = index_entry[0]
             sys.stdout.write(f"Processing {input_file}...\n")
