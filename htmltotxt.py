@@ -45,6 +45,8 @@ def transform_html_to_whatsapp(html_file):
             text_find = message.find('div', class_='text')
             if text_find is not None:
                 text = text_find.text.strip()
+            else:
+                text = None
             
             media_find = message.find('div', class_='media_wrap')
             if media_find is not None:
