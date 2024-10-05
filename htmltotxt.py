@@ -23,10 +23,7 @@ def transform_html_to_whatsapp(html_file):
     # Transform messages to WhatsApp format
     whatsapp_chat = ''
     media = []
-    media_dates = {
-        'IMG': {},
-        'VID': {},
-    }
+    media_dates = {}
     m = 0
     date_register = {}
     for message in messages:
@@ -56,14 +53,18 @@ def transform_html_to_whatsapp(html_file):
                         type_classifier = 'IMG'
                     elif 'video_file_wrap' in media_link['class']:
                         type_classifier = 'VID'
+                    elif 'animated_wrap' in media_link['class']:
+                        type_classifier = 'VID'
+                    elif 'media' in media_link['class']:
+                        type_classifier = 'DOC'
                     else:
                         sys.stderr.write(f"WARN: Detected unknown media type in message #{m} ({date_str} {time_str}): {media_link.attrs}\n")
                         type_classifier = None
                     if type_classifier:
                         filename = media_link['href']
                         filename_date = real_date.strftime('%Y%m%d')
-                        filename_index = media_dates[type_classifier].get(filename_date, 0)
-                        media_dates[type_classifier][filename_date] = filename_index+1
+                        filename_index = media_dates.get(filename_date, 0)
+                        media_dates[filename_date] = filename_index+1
                         filename_ext = pathlib.Path(filename).suffix
                         new_filename = f"{type_classifier}-{filename_date}-WA{filename_index:04}.{file_ext}"
                         media.append((new_filename, filename))
