@@ -1,6 +1,7 @@
 import argparse
 from bs4 import BeautifulSoup
 import pathlib
+import pprint
 import sys
 import traceback
 import zipfile
@@ -34,14 +35,31 @@ def transform_html_to_whatsapp(html_file, text_file):
             else:
                 date_str, time_str = None, None
 
-            text = message.find('div', class_='text').text.strip()
-
+            text_find = message.find('div', class_='text')
+            if text_find is not None:
+                text = text_find.text.strip()
+            
+            media_find = message.find('div', class_='media_wrap')
+            media = []
+            if media_find is not None:
+                for media_link in media_find.find_all('a'):
+                    if 'photo_wrap' in media_link.attrs:
+                        media.append(media_link['href'])
+                    elif 'video_wrap' in media_link.attrs:
+                        media.append(media_link['href'])
+                    else:
+                        sys.stderr.write(f"WARN: Detected unknown media type in message #{m} ({date_str} {time_str}): {media_link['attrs']}")
             # Format message in WhatsApp format
             if time_str:
-                whatsapp_message = f'[{date_str}, {time_str}] {sender}: {text}\n'
+                whatsapp_message = ''
+                if text:
+                    whatsapp_message += f'[{date_str}, {time_str}] {sender}: {text}\n'
+                if media:
+                    for media_item in media:
+                        whatsapp_message += f'[{date_str}, {time_str}] {sender}: {media_item} (file attached)\n'
                 whatsapp_chat += whatsapp_message
         except AttributeError as e:
-            tbf = traceback.TracebackException.from_exception(e).format()
+            tbf = str(traceback.TracebackException.from_exception(e).format())
             sys.stderr.write(f"ERROR: Failed to parse message #{m} with traceback:{tbf}, source data follows:\n{message.prettify()}\n")
         m += 1
 
