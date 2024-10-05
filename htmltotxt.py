@@ -68,7 +68,7 @@ def transform_html_to_whatsapp(html_file):
                         filename_index = media_dates.get(filename_date, 0)
                         media_dates[filename_date] = filename_index+1
                         filename_ext = pathlib.Path(filename).suffix
-                        new_filename = f"{type_classifier}-{filename_date}-WA{filename_index:04}.{filename_ext}"
+                        new_filename = f"{type_classifier}-{filename_date}-WA{filename_index:04}{filename_ext}"
                         media.append((new_filename, filename))
             # Format message in WhatsApp format
             if time_str:
@@ -103,7 +103,10 @@ def what_zip(whatsapp_transform, base_path, name="Whatsapp Chat - person_name.zi
             chat_agg += block["chat"]
             for file in block["media"]:
                 sys.stdout.write(f"INFO: Adding {file[1]} as {file[0]}\n")
-                zip_object.write(filename=pathlib.Path(base_path, file[1]), arcname=file[0])
+                try:
+                    zip_object.write(filename=pathlib.Path(base_path, file[1]), arcname=file[0])
+                except FileNotFoundError:
+                    sys.stderr.write(f"WARN: Could not locate file {file[1]}, skipping")
         zip_object.writestr(zinfo_or_arcname="_chat.txt", data=chat_agg)
     sys.stdout.write(f"ZIP file written to {zip_object.filename}\n")
 
