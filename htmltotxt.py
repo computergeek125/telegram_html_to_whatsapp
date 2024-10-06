@@ -1,16 +1,23 @@
 import argparse
-from bs4 import BeautifulSoup
 import datetime
-import os
 import pathlib
-import pprint
 import re
 import sys
 import traceback
 import zipfile
 
+from bs4 import BeautifulSoup
+
 
 def transform_html_to_whatsapp(html_file):
+    """Converts an HTML file from Telegram into a representation of WhatsApp `_chat.txt` format
+
+    Args:
+        html_file (file): HTML file to read
+
+    Returns:
+        dict: Dictionary representing the WhatsApp chat and references to the media
+    """
     # Read the HTML file
     with open(html_file, "r", encoding="utf-8") as file:
         html_content = file.read()
@@ -26,7 +33,6 @@ def transform_html_to_whatsapp(html_file):
     media_all = []
     media_dates = {}
     m = 0
-    date_register = {}
     for message in messages:
         try:
             sender_element = message.find("div", class_="from_name")
@@ -43,7 +49,7 @@ def transform_html_to_whatsapp(html_file):
                 date_str = timestamp[:10]
                 time_str = timestamp[11:19]
             else:
-                real_date, date_str, time_str = None, None
+                real_date, date_str, time_str = None, None, None
 
             text_find = message.find("div", class_="text")
             if text_find is not None:
@@ -105,14 +111,21 @@ def transform_html_to_whatsapp(html_file):
 # transform_html_to_whatsapp('messages.html')
 
 
-def what_zip(whatsapp_transform, base_path, name="Whatsapp Chat - person_name.zip"):
+def what_zip(transform_input, base_path, name="Whatsapp Chat - person_name.zip"):
+    """Writes a new ZIP file in the WhatsApp format
+
+    Args:
+        transform_input (dict): Source material to amalgamate - from `transform_html_to_whatsapp`
+        base_path (Path):       Path to Telegram export base
+        name (str):             String name of the resulting ZIP file
+    """
     bn = 0
     with zipfile.ZipFile(
         pathlib.Path(base_path.parent, name), "w", compression=zipfile.ZIP_DEFLATED
     ) as zip_object:
         sys.stdout.write(f"INFO: Exporting transform block {bn}\n")
         chat_agg = ""
-        for block in whatsapp_transform:
+        for block in transform_input:
             chat_agg += block["chat"]
             for file in block["media"]:
                 sys.stdout.write(f"INFO: Adding {file[1]} as {file[0]}\n")
