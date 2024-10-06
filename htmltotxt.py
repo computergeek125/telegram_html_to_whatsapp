@@ -100,15 +100,6 @@ def transform_html_to_whatsapp(html_file):
         m += 1
     rval = {"chat": whatsapp_chat, "media": media_all}
     return rval
-    # Save the transformed chat to a file
-    # with open(text_file, 'w', encoding='utf-8') as file:
-    #    file.write(whatsapp_chat)
-
-    # print(f'Transformation complete. The WhatsApp chat export is saved as {text_file}')
-
-
-# Usage example
-# transform_html_to_whatsapp('messages.html')
 
 
 def what_zip(transform_input, base_path, name="Whatsapp Chat - person_name.zip"):
