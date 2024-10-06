@@ -54,6 +54,7 @@ def transform_html_to_whatsapp(html_file, logger: logging.Logger):
 
             text_find = message.find("div", class_="text")
             if text_find is not None:
+                logger.debug("Found text: %s", text_find.prettify())
                 text = text_find.text.strip()
             else:
                 text = None
@@ -61,6 +62,7 @@ def transform_html_to_whatsapp(html_file, logger: logging.Logger):
             media_find = message.find("div", class_="media_wrap")
             media_message = []
             if media_find is not None:
+                logger.debug("Found media: %s", media_find.prettify())
                 for media_link in media_find.find_all("a"):
                     if "photo_wrap" in media_link["class"]:
                         type_classifier = "IMG"
@@ -96,6 +98,7 @@ def transform_html_to_whatsapp(html_file, logger: logging.Logger):
                 if media_message:
                     for media_item in media_message:
                         whatsapp_message += f"[{date_str}, {time_str}] {sender}: {media_item[0]} (file attached)\n"
+                logger.debug("Generated message: %s", whatsapp_message)
                 whatsapp_chat += whatsapp_message
         except AttributeError:
             # tbf = str(traceback.format_exc())
