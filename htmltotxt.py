@@ -160,7 +160,7 @@ if __name__ == "__main__":
         default=False,
     )
     args = parser.parse_args()
-    global_logger = logging.getLogger("xmc_map_builder")
+    global_logger = logging.getLogger("htmltotxt")
     log_han = logging.StreamHandler()
     log_fmt = logging.Formatter("%(asctime)s:%(name)s:%(levelname)s: %(message)s")
     log_han.setFormatter(log_fmt)
