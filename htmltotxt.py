@@ -60,12 +60,21 @@ def transform_html_to_whatsapp(html_file, logger: logging.Logger):
                     m,
                     message.prettify().strip(),
                 )
-            if telegram_id < 0:
-                date_flag_element = message.find("div", class_="body details")
-                date_flag = date_flag_element.text.strip()
-                logger.debug(
-                    "Skipping telegram ID#%i (timestamp %s)", telegram_id, date_flag
-                )
+            if "service" in message["class"]:
+                service_msg_element = message.find("div", class_="body details")
+                service_msg = service_msg_element.text.strip()
+                if telegram_id < 0:
+                    logger.info(
+                        'Skipping telegram visual timestamp at ID#%i ("%s")',
+                        telegram_id,
+                        service_msg,
+                    )
+                else:
+                    logger.info(
+                        'Skipping telegram service message at ID#%i ("%s")',
+                        telegram_id,
+                        service_msg,
+                    )
                 if LOG_TRACE:
                     logger.debug(
                         "Message %i ID#%i data:\n%s",
@@ -74,8 +83,7 @@ def transform_html_to_whatsapp(html_file, logger: logging.Logger):
                         message.prettify().strip(),
                     )
                 continue
-            else:
-                tids_processed += 1
+            tids_processed += 1
             sender = None
             if "joined" in message["class"] and m > 0:
                 last_msg = whatsapp_buffer[-1]
