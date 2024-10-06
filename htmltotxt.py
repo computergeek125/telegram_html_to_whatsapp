@@ -1,5 +1,6 @@
 import argparse
 import datetime
+import logging
 import pathlib
 import re
 import sys
@@ -9,7 +10,7 @@ import zipfile
 from bs4 import BeautifulSoup
 
 
-def transform_html_to_whatsapp(html_file):
+def transform_html_to_whatsapp(html_file, logger: logging.Logger):
     """Converts an HTML file from Telegram into a representation of WhatsApp `_chat.txt` format
 
     Args:
@@ -70,8 +71,12 @@ def transform_html_to_whatsapp(html_file):
                     elif "media" in media_link["class"]:
                         type_classifier = "DOC"
                     else:
-                        sys.stderr.write(
-                            f"WARN: Detected unknown media type in message #{m} ({date_str} {time_str}): {media_link.attrs}\n"
+                        logger.warning(
+                            "Detected unknown media type in message #%i (%s %s): %s",
+                            m,
+                            date_str,
+                            time_str,
+                            media_link.attrs,
                         )
                         type_classifier = None
                     if type_classifier:
@@ -93,16 +98,24 @@ def transform_html_to_whatsapp(html_file):
                         whatsapp_message += f"[{date_str}, {time_str}] {sender}: {media_item[0]} (file attached)\n"
                 whatsapp_chat += whatsapp_message
         except AttributeError:
-            tbf = str(traceback.format_exc())
-            sys.stderr.write(
-                f"ERROR: Failed to parse message #{m} with traceback:\n{tbf}Source data follows:\n{message.prettify()}\n"
+            # tbf = str(traceback.format_exc())
+            logger.exception(
+                "Failed to parse message #%i\nSource data follows:%s\n",
+                m,
+                message.prettify(),
+                exc_info=True,
             )
         m += 1
     rval = {"chat": whatsapp_chat, "media": media_all}
     return rval
 
 
-def what_zip(transform_input, base_path, name="Whatsapp Chat - person_name.zip"):
+def what_zip(
+    transform_input,
+    base_path,
+    logger: logging.Logger,
+    name="Whatsapp Chat - person_name.zip",
+):
     """Writes a new ZIP file in the WhatsApp format
 
     Args:
@@ -114,20 +127,20 @@ def what_zip(transform_input, base_path, name="Whatsapp Chat - person_name.zip")
     with zipfile.ZipFile(
         pathlib.Path(base_path.parent, name), "w", compression=zipfile.ZIP_DEFLATED
     ) as zip_object:
-        sys.stdout.write(f"INFO: Exporting transform block {bn}\n")
+        logger.info("Exporting transform block %s", bn)
         chat_agg = ""
         for block in transform_input:
             chat_agg += block["chat"]
             for file in block["media"]:
-                sys.stdout.write(f"INFO: Adding {file[1]} as {file[0]}\n")
+                logger.info("Adding %s as %s", file[1], file[0])
                 try:
                     zip_object.write(
                         filename=pathlib.Path(base_path, file[1]), arcname=file[0]
                     )
                 except FileNotFoundError:
-                    sys.stderr.write(f"WARN: Could not locate file {file[1]}, skipping")
+                    logger.warning("Could not locate file %s, skipping", file[1])
         zip_object.writestr(zinfo_or_arcname="_chat.txt", data=chat_agg)
-    sys.stdout.write(f"ZIP file written to {zip_object.filename}\n")
+    logger.info("ZIP file written to %s", zip_object.filename)
 
 
 if __name__ == "__main__":
@@ -139,12 +152,32 @@ if __name__ == "__main__":
         "--dir",
         help="Name of directory of files to parse - will parse every html in this folder",
     )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        help="Enables verbose (debug) logging",
+        action="store_true",
+        default=False,
+    )
     args = parser.parse_args()
+    global_logger = logging.getLogger("xmc_map_builder")
+    log_han = logging.StreamHandler()
+    log_fmt = logging.Formatter("%(asctime)s:%(name)s:%(levelname)s: %(message)s")
+    log_han.setFormatter(log_fmt)
+    global_logger.addHandler(log_han)
+    if args.verbose:
+        global_logger.setLevel(logging.DEBUG)
+    else:
+        global_logger.setLevel(logging.INFO)
 
     if args.file:
         input_file = pathlib.Path(args.file)
-        whatsapp_transform = transform_html_to_whatsapp(input_file)
-        what_zip([whatsapp_transform], base_path=input_file.parent)
+        whatsapp_transform = transform_html_to_whatsapp(
+            input_file, logger=global_logger
+        )
+        what_zip(
+            [whatsapp_transform], base_path=input_file.parent, logger=global_logger
+        )
 
     else:
         whatsapp_transforms = []
@@ -159,11 +192,15 @@ if __name__ == "__main__":
                 file_num = int(file_num)
             input_index.append((input_file, file_num))
         input_index = sorted(input_index, key=lambda x: x[1])
-        sys.stdout.write(f"Discovered {len(input_index)} input files\n")
+        global_logger.info("Discovered %i input files", len(input_index))
         for index_entry in input_index:
             input_file = index_entry[0]
-            sys.stdout.write(f"Processing {input_file}...\n")
-            whatsapp_transforms.append(transform_html_to_whatsapp(input_file))
+            global_logger.info("Processing %s...", input_file)
+            whatsapp_transforms.append(
+                transform_html_to_whatsapp(input_file, logger=global_logger)
+            )
 
         zip_name = f"Whatsapp Chat - {dir_path.name}.zip"
-        what_zip(whatsapp_transforms, name=zip_name, base_path=dir_path)
+        what_zip(
+            whatsapp_transforms, name=zip_name, base_path=dir_path, logger=global_logger
+        )
