@@ -60,11 +60,18 @@ def transform_html_to_whatsapp(html_file, logger: logging.Logger):
                     m,
                     message.prettify().strip(),
                 )
-            if telegram_id == -1:
-                logger.debug("Skipping telegram ID#-1")
+            if telegram_id < 0:
+                date_flag_element = message.find("div", class_="body details")
+                date_flag = date_flag_element.text.strip()
+                logger.debug(
+                    "Skipping telegram ID#%i (timestamp %s)", telegram_id, date_flag
+                )
                 if LOG_TRACE:
                     logger.debug(
-                        "Message %i ID#-1 data:\n%s", m, message.prettify().strip()
+                        "Message %i ID#%i data:\n%s",
+                        m,
+                        telegram_id,
+                        message.prettify().strip(),
                     )
                 continue
             else:
