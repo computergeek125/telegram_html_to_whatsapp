@@ -1,13 +1,27 @@
 import argparse
+from collections import namedtuple
 import datetime
 import logging
 import pathlib
 import re
-import sys
-import traceback
 import zipfile
 
 from bs4 import BeautifulSoup
+
+LOG_TRACE = False
+
+WhatsappMessageStruct = namedtuple(
+    "WAMS",
+    [
+        "telegram_id",
+        "real_date",
+        "date_str",
+        "time_str",
+        "sender",
+        "text",
+        "media_message",
+    ],
+)
 
 
 def transform_html_to_whatsapp(html_file, logger: logging.Logger):
@@ -30,31 +44,65 @@ def transform_html_to_whatsapp(html_file, logger: logging.Logger):
     messages = soup.find_all("div", class_="message")
 
     # Transform messages to WhatsApp format
-    whatsapp_chat = ""
+    whatsapp_buffer = []
     media_all = []
     media_dates = {}
     m = 0
     for message in messages:
         try:
-            sender_element = message.find("div", class_="from_name")
-            if sender_element is None:
-                continue  # Skip messages without sender information
-
-            sender = sender_element.text.strip()
-            timestamp_div = message.find("div", class_="pull_right date details")
-            if timestamp_div:
-                timestamp = timestamp_div["title"]
-                real_date = datetime.datetime.strptime(
-                    timestamp, "%d.%m.%Y %H:%M:%S UTC%z"
-                )
-                date_str = timestamp[:10]
-                time_str = timestamp[11:19]
+            if message["id"].startswith("message"):
+                telegram_id = int(message["id"][7:])
             else:
-                real_date, date_str, time_str = None, None, None
+                telegram_id = None
+                logger.warning(
+                    "Failed to parse message #%i telegram ID from data:\n%s",
+                    m,
+                    message.prettify(),
+                )
+            if telegram_id == -1:
+                logger.debug("Skipping telegram ID#-1")
+                if LOG_TRACE:
+                    logger.debug("Message %i ID#-1 data:\n%s", m, message.prettify())
+                continue
+            sender = None
+            if "joined" in message["class"] and m > 0:
+                last_msg = whatsapp_buffer[-1]
+                real_date = last_msg.real_date
+                date_str = last_msg.date_str
+                time_str = last_msg.time_str
+                sender = last_msg.sender
+            else:
+                sender_element = message.find("div", class_="from_name")
+                sender = sender_element.text.strip()
+                timestamp_div = message.find("div", class_="pull_right date details")
+                if timestamp_div:
+                    timestamp = timestamp_div["title"]
+                    real_date = datetime.datetime.strptime(
+                        timestamp, "%d.%m.%Y %H:%M:%S UTC%z"
+                    )
+                    date_str = timestamp[:10]
+                    time_str = timestamp[11:19]
+                else:
+                    real_date, date_str, time_str = None, None, None
+
+            if sender is None:
+                logger.warning(
+                    "Message #%i (ID#%i): found orphaned data:\n%s",
+                    m,
+                    telegram_id,
+                    message.prettify(),
+                )
+                continue  # Skip messages without sender information
 
             text_find = message.find("div", class_="text")
             if text_find is not None:
-                logger.debug("Found text: %s", text_find.prettify())
+                if LOG_TRACE:
+                    logger.debug(
+                        "Message #%i (ID#%i): found data:\n%s",
+                        m,
+                        telegram_id,
+                        text_find.prettify(),
+                    )
                 text = text_find.text.strip()
             else:
                 text = None
@@ -62,7 +110,13 @@ def transform_html_to_whatsapp(html_file, logger: logging.Logger):
             media_find = message.find("div", class_="media_wrap")
             media_message = []
             if media_find is not None:
-                logger.debug("Found media: %s", media_find.prettify())
+                if LOG_TRACE:
+                    logger.debug(
+                        "Message #%i (ID#%i): found media data:\n%s",
+                        m,
+                        telegram_id,
+                        media_find.prettify(),
+                    )
                 for media_link in media_find.find_all("a"):
                     if "photo_wrap" in media_link["class"]:
                         type_classifier = "IMG"
@@ -74,8 +128,9 @@ def transform_html_to_whatsapp(html_file, logger: logging.Logger):
                         type_classifier = "DOC"
                     else:
                         logger.warning(
-                            "Detected unknown media type in message #%i (%s %s): %s",
+                            "Detected unknown media type in message #%i (ID#%i) (%s %s): %s",
                             m,
+                            telegram_id,
                             date_str,
                             time_str,
                             media_link.attrs,
@@ -90,25 +145,43 @@ def transform_html_to_whatsapp(html_file, logger: logging.Logger):
                         new_filename = f"{type_classifier}-{filename_date}-WA{filename_index:04}{filename_ext}"
                         media_all.append((new_filename, filename))
                         media_message.append(new_filename)
-            # Format message in WhatsApp format
-            if time_str:
-                whatsapp_message = ""
-                if text:
-                    whatsapp_message += f"[{date_str}, {time_str}] {sender}: {text}\n"
-                if media_message:
-                    for media_item in media_message:
-                        whatsapp_message += f"[{date_str}, {time_str}] {sender}: {media_item[0]} (file attached)\n"
-                logger.debug("Generated message: %s", whatsapp_message)
-                whatsapp_chat += whatsapp_message
+            whatsapp_buffer.append(
+                WhatsappMessageStruct(
+                    telegram_id=telegram_id,
+                    real_date=real_date,
+                    date_str=date_str,
+                    time_str=time_str,
+                    sender=sender,
+                    text=text,
+                    media_message=media_message,
+                )
+            )
         except AttributeError:
             # tbf = str(traceback.format_exc())
             logger.exception(
-                "Failed to parse message #%i\nSource data follows:%s\n",
+                "Failed to parse message #%i (ID#%i): found data:%s\n",
                 m,
+                telegram_id,
                 message.prettify(),
                 exc_info=True,
             )
         m += 1
+
+    whatsapp_chat = ""
+    for message in whatsapp_buffer:
+        # Format message in WhatsApp format
+        if message.time_str:
+            logger.debug("Source data: %s", message)
+            whatsapp_message = ""
+            if message.text:
+                whatsapp_message += f"[{message.date_str}, {message.time_str}] {message.sender}: {message.text}\n"
+            if message.media_message:
+                for media_item in message.media_message:
+                    whatsapp_message += f"[{message.date_str}, {message.time_str}] {message.sender}: {media_item} (file attached)\n"
+            logger.debug("Generated message: %s", repr(whatsapp_message))
+            whatsapp_chat += whatsapp_message
+        else:
+            logger.error("Found orphaned parsed message:", message)
     rval = {"chat": whatsapp_chat, "media": media_all}
     return rval
 
@@ -162,17 +235,27 @@ if __name__ == "__main__":
         action="store_true",
         default=False,
     )
+    parser.add_argument(
+        "-t",
+        "--trace",
+        help="Enables additional trace debug logging (implies --verbose)",
+        action="store_true",
+        default=False,
+    )
     args = parser.parse_args()
     global_logger = logging.getLogger("htmltotxt")
     log_han = logging.StreamHandler()
     log_fmt = logging.Formatter("%(asctime)s:%(name)s:%(levelname)s: %(message)s")
     log_han.setFormatter(log_fmt)
     global_logger.addHandler(log_han)
-    if args.verbose:
+    if args.verbose or args.trace:
         global_logger.setLevel(logging.DEBUG)
     else:
         global_logger.setLevel(logging.INFO)
-
+    if args.trace:
+        LOG_TRACE = True
+    else:
+        LOG_TRACE = False
     if args.file:
         input_file = pathlib.Path(args.file)
         whatsapp_transform = transform_html_to_whatsapp(
