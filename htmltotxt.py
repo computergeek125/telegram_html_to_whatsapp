@@ -48,6 +48,7 @@ def transform_html_to_whatsapp(html_file, logger: logging.Logger):
     media_all = []
     media_dates = {}
     m = 0
+    tids_processed = 0
     for message in messages:
         try:
             if message["id"].startswith("message"):
@@ -57,13 +58,17 @@ def transform_html_to_whatsapp(html_file, logger: logging.Logger):
                 logger.warning(
                     "Failed to parse message #%i telegram ID from data:\n%s",
                     m,
-                    message.prettify(),
+                    message.prettify().strip(),
                 )
             if telegram_id == -1:
                 logger.debug("Skipping telegram ID#-1")
                 if LOG_TRACE:
-                    logger.debug("Message %i ID#-1 data:\n%s", m, message.prettify())
+                    logger.debug(
+                        "Message %i ID#-1 data:\n%s", m, message.prettify().strip()
+                    )
                 continue
+            else:
+                tids_processed += 1
             sender = None
             if "joined" in message["class"] and m > 0:
                 last_msg = whatsapp_buffer[-1]
@@ -90,7 +95,7 @@ def transform_html_to_whatsapp(html_file, logger: logging.Logger):
                     "Message #%i (ID#%i): found orphaned data:\n%s",
                     m,
                     telegram_id,
-                    message.prettify(),
+                    message.prettify().strip(),
                 )
                 continue  # Skip messages without sender information
 
@@ -101,7 +106,7 @@ def transform_html_to_whatsapp(html_file, logger: logging.Logger):
                         "Message #%i (ID#%i): found data:\n%s",
                         m,
                         telegram_id,
-                        text_find.prettify(),
+                        text_find.prettify().strip(),
                     )
                 text = text_find.text.strip()
             else:
@@ -115,7 +120,7 @@ def transform_html_to_whatsapp(html_file, logger: logging.Logger):
                         "Message #%i (ID#%i): found media data:\n%s",
                         m,
                         telegram_id,
-                        media_find.prettify(),
+                        media_find.prettify().strip(),
                     )
                 for media_link in media_find.find_all("a"):
                     if "photo_wrap" in media_link["class"]:
@@ -162,7 +167,7 @@ def transform_html_to_whatsapp(html_file, logger: logging.Logger):
                 "Failed to parse message #%i (ID#%i): found data:%s\n",
                 m,
                 telegram_id,
-                message.prettify(),
+                message.prettify().strip(),
                 exc_info=True,
             )
         m += 1
@@ -182,6 +187,17 @@ def transform_html_to_whatsapp(html_file, logger: logging.Logger):
             whatsapp_chat += whatsapp_message
         else:
             logger.error("Found orphaned parsed message:", message)
+    if len(whatsapp_buffer) != tids_processed:
+        logger.warning(
+            "Number of Telegram IDs generated (%i) does not match the number of messages processed (%i), you may have orphaned data!",
+            tids_processed,
+            len(whatsapp_buffer),
+        )
+    else:
+        logger.info(
+            "Number of Telegram IDs generated (%i) matches the number of messages processed, likely a successful run!",
+            tids_processed,
+        )
     rval = {"chat": whatsapp_chat, "media": media_all}
     return rval
 
